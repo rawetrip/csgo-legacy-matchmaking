@@ -71,6 +71,10 @@ tools/
   归档 appid 被引擎拒绝这一问题的参考实现（有预编译 `.so`）；我们最终选择自己实现了
   `tools/appidfix.c`。
 
+## Contributors
+
+**DeepSeek** —— 逆向分析与调试（cdb 断点、反汇编、GC 侧补丁）
+
 ## 说明
 
 仅用于**自建服务器 / 离线环境下的兼容性研究**。所有测试都在非 VAC secure 的自建
