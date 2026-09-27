@@ -30,10 +30,6 @@ CS:GO Legacy 的官方 GC 早已下线，因此「竞技」按钮点了不会有
 ## 目录
 
 ```
-docs/
-  csgo-session-summary.md    较晚一次会话的完整技术总结（逐条解析 transcript）
-  csgo-session-summary-2.md  更早一次会话的总结
-  csgo-match-handoff.md      交接文档：环境拓扑、已修问题、踩过的坑、当前卡点
 tools/
   appidfix.c              LD_PRELOAD 补丁：绕过引擎对归档 appid 的拒绝
   fix_stack.py            原地修改 PE 头（栈保留大小 / LARGE_ADDRESS_AWARE）
@@ -46,7 +42,7 @@ tools/
   readd_validate.py       补回 Server2GCClientValidate
 ```
 
-## 常用手法（详见 docs/）
+## 常用手法
 
 - **cdb 必须「附加」而不能直接启动游戏**：直接用调试器拉起 `csgo.exe` 会让 Steam 认为
   不是它启动的，客户端进入 insecure 状态，匹配按钮被禁用。
