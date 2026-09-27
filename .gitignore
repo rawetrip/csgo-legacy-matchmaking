@@ -1,0 +1,4 @@
+cdb_*.txt
+_*.py
+__pycache__/
+*.log
