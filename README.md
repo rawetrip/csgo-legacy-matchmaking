@@ -54,6 +54,23 @@ tools/
 - **别对附加中的 cdb 用 timeout 强杀**：被调试的游戏会跟着一起死。
 - **改源文件注意编码**：C++ 侧是 GBK（MSVC 按 936 读），GC 的 JS 是 UTF-8，别混。
 
+## 相关项目
+
+本项目的多个环节参考或使用了以下上游 / 同类项目：
+
+- **[mikkokko/csgo_gc](https://github.com/mikkokko/csgo_gc)** —— 同样是为 CS:GO legacy 写的自建 GC，
+  用 funchook 拦 Steam API 并替换 launcher。**它是 `9164` 等消息的权威参照**
+  （本项目统一使用的 reservation cookie `0x293A206F6C6C6548` 即出自它的
+  `gc_const_csgo.h:6 GameServerCookieId`，该值与 `"Hello :)"` 的字面量一致）。
+  需注意：**它没有实现匹配** —— `gc_shared.cpp` 里 9101/9103/9107 只有名字表、没有处理函数，
+  所以匹配这一层没有现成参照，只能自己逆。
+- **[aka3257/CSGO-GC-Replacement](https://github.com/aka3257/CSGO-GC-Replacement)** 与
+  **[aka3257/csgc](https://github.com/aka3257/csgc)** —— 本项目所用的外部 JS GC 与
+  客户端注入框架（`csgc.dll`）的出处。
+- **[eonexdev/csgo-sv-fix-engine](https://github.com/eonexdev/csgo-sv-fix-engine)** ——
+  归档 appid 被引擎拒绝这一问题的参考实现（有预编译 `.so`）；我们最终选择自己实现了
+  `tools/appidfix.c`。
+
 ## 说明
 
 仅用于**自建服务器 / 离线环境下的兼容性研究**。所有测试都在非 VAC secure 的自建
