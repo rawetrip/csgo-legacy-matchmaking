@@ -18,6 +18,12 @@ SRC = r"C:\Users\Administrator\popup_accept_orig.xml"
 DST = r"C:\Users\Administrator\popup_accept_new.xml"
 
 REPL = [
+    # 外层盒子尺寸钉死。
+    # ★ CSS 里 .accept-match__bg 的 height 是 fit-children、背景是 videos/gobutton.webm，
+    #   实测面板高度不随内容变（一直 480）—— 像是被那个视频背景撑住了。
+    #   内联样式优先，直接给死高度/宽度，才能压到官方休闲版的 ~270px。
+    (b'<Panel class="accept-match__bg">',
+     b'<Panel class="accept-match__bg" style="min-width: 620px; height: 278px;">'),
     # 假阵容（两队 + 假 XUID 头像）
     (b'<Panel id="id-map-draft-phase-teams" class="map-draft-phase-teams">',
      b'<Panel id="id-map-draft-phase-teams" class="map-draft-phase-teams" style="visibility:collapse;">'),

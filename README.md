@@ -127,8 +127,13 @@ GC 下发的 `Hello :)`（`0x293A206F6C6C6548`），两者不等 → 连接被�
   （0/10 计数行）加内联 `visibility:collapse`。**只能隐藏、不能删节点** —— 弹窗 JS 会对着
   这些 id 做 `RemoveAndDeleteChildren()` / `SetDialogVariableInt()` / `RemoveClass()`，
   节点缺失直接抛异常把 UI 搞坏（`tools/patch_popup.py`）
-- **尺寸**：`.accept-match__map` 高度 300px → 200px（300 是竞技版给阵容区留的，
-  公告式模式用不上；`tools/patch_popup_css.py`）
+- **尺寸**：两处一起改才有效（`tools/patch_popup_css.py` + `tools/patch_popup.py`）
+  - `.accept-match__map` 高度 300px → 150px
+  - **外层盒子要内联钉死**：给 `<Panel class="accept-match__bg">` 加
+    `style="min-width: 620px; height: 278px;"`
+  > 坑：只改地图高度**没有任何效果** —— 那层的 CSS 是 `height: fit-children`，
+  > 背景又是一个视频 `videos/gobutton.webm`，实测面板高度不随内容变（一直 480）。
+  > 必须用内联样式把外层尺寸钉死，才能压到官方休闲版的约 270px。
 
 > 顺带记录一个官方 bug：`mm_success_lets_roll.wav` 在 CS2/CS:GO 官方客户端里**会放两遍**
 > （`_OnNqmmAutoReadyUp` 与另一条路径各播一次）。我们的实现只播一遍 —— 想复现官方行为

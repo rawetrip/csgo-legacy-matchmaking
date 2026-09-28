@@ -128,22 +128,30 @@ je  1d2790             ; ★ 服务器 cookie == 0 → 也放行
   `Client "as_R4nd0m" connected`）。
   （客户端发给 GC 的消息类型统计，便于以后定位：9164×2298、9103×1832、4006×68、
   **9101×66**、9201×64、9102×23。）
-- ~~弹窗精简~~ **已完成**（做成 CS2 那样只有标题 + 模式·地图）。
-  **关键：只能隐藏、不能删节点** —— `popup_accept_match.js` 会对这些面板做
-  `RemoveAndDeleteChildren()` / `SetDialogVariableInt()` / `RemoveClass('hidden')`，
-  节点不存在会直接抛异常把 UI 搞坏。做法：在 `panorama/layout/popups/popup_accept_match.xml` 里
-  给 `<Panel id="id-map-draft-phase-teams">`（假阵容）和 `<Panel class="accept-match__slots-count">`
-  （0/10 计数行）加**内联 `style="visibility:collapse;"`**，id 全部保留
-  （生成脚本 `~/patch_popup.py`，装回 pbin 后必须回读 + `xml.etree` 校验）。
-  - **时序**（对齐 CS2「弹窗只出现约 5 秒」）：`csgc` 的连接延时 **5s**
-    （`steam_hook_lite.cpp` 的 `Sleep(5000)`），`party.js` 在 **4.6s** 关弹窗
-    → 弹窗可见约 5 秒，且在连接前消失，不会压到加载画面上。
-  - **音效**：官方是引擎抛 `ServerReserved` 时自己播「比赛就绪」音、玩家按接受时播确认音；
-    我们既然自己抛事件就得自己补 —— 弹窗出现时补播 `popup_accept_match_found`
-    （`game_ready_02.wav`），关闭时补播 `popup_accept_match_confirmed`（`mm_success_lets_roll.wav`）。
-  - **踩过的信号坑**：轮询 `GameStateAPI.IsPlayerConnected()` 在「正在连接至服务器…」阶段
-    仍是 false，`IsLocalPlayerPlayingMatch()` 更晚，所以**都不能用来判断「进加载了」**；
-    目前靠 4.6s 定时器 + `GameState_LevelInitPreEntity` 事件兜底。
+- ~~弹窗~~ **已完成（走的是官方路径）**。核心是发现 `ServerReserved` 的 **map 参数前面加一个 `@`**
+  就切到官方「公告式自动就绪」模式（`popup_accept_match.js` 里 `map.charAt(0) === '@'`），
+  一次拿到三个东西：CS2 那种只剩标题+模式·地图的形态（官方 `auto` 样式）、
+  安静的 `waitquiet`（**休闲模式没有 beep 的原因**）、以及 1.9 秒后官方
+  `_OnNqmmAutoReadyUp` 自动执行（播 `mm_success_lets_roll`、`LobbyAPI.SetLocalPlayerReady('deferred')`、
+  用官方路径关弹窗 —— 那句一直刷的 `will not queue connect` 就是之前没调 SetLocalPlayerReady）。
+  - **只能隐藏、不能删节点** —— `popup_accept_match.js` 会对这些面板做
+    `RemoveAndDeleteChildren()` / `SetDialogVariableInt()` / `RemoveClass('hidden')`，
+    节点不存在直接抛异常把 UI 搞坏。给 `id-map-draft-phase-teams`（假阵容）和
+    `accept-match__slots-count`（0/10 计数行）加**内联 `style="visibility:collapse;"`**，id 全保留。
+  - **布局**：把 `AcceptMatchDataContainer` 移到 `AcceptMatchMapImage` **之前**（休闲形式是
+    文字在上、小地图在下；原 XML 是竞技版顺序）。（`patch_popup.py` 用配平计数切块 ——
+    注意自闭合 `<Panel .../>` 不能计 +1，否则永远配不平。）
+  - **尺寸**（两处都得改，只改一处无效）：① `.accept-match__map` 高度 300px → **150px**；
+    ② 给 `<Panel class="accept-match__bg">` 加内联 `style="min-width: 620px; height: 278px;"`。
+    那层 CSS 是 `height: fit-children`、背景是视频 `gobutton.webm`，
+    **只改地图高度面板高度纹丝不动（一直 480）**。
+  - **时序**：官方 1.9s 自动就绪关弹窗 → `csgc` 连接延时设 **2.6s**（`Sleep(2600)`），
+    衔接紧凑。`party.js` 里 12s 的定时器和 `GameState_LevelInitPreEntity` 只作兜底。
+  - **音效**：官方由引擎在抛 `ServerReserved` 时播「就绪音」，我们自己抛就得自己补
+    `popup_accept_match_found`（`game_ready_02.wav`）。**不要**再补 `..._confirmed` ——
+    官方 `_OnNqmmAutoReadyUp` 已经播了，多播一次就是官方那个「lets roll 响两遍」的 bug。
+  - **踩过的信号坑**：`GameStateAPI.IsPlayerConnected()` 在「正在连接至服务器…」阶段仍是 false、
+    `IsLocalPlayerPlayingMatch()` 更晚，**都不能用来判断「进加载了」**。
 - 弹窗里的**假玩家名**（`[unknown]`/好友名）：GC 不发真实阵容，客户端拿垃圾 XUID
   去解析出来的，无实际影响。
 
