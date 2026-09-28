@@ -1,5 +1,7 @@
 # CS:GO Legacy 自建 GC / 匹配逆向笔记
 
+> **English version: [README.en.md](README.en.md)** ← 英文读者请看这里
+
 把 **CS:GO Legacy**（归档 appid `4465480`）的「开始竞技」真正送进一局所做的事后记录。
 
 这不是一个能开箱跑起来的成品，而是一份**结案记录 + 可复用工具**：记录了做到哪一步、
@@ -275,3 +277,19 @@ tools/
 
 仅用于**自建服务器 / 离线环境下的兼容性研究**。所有测试都在非 VAC secure 的自建
 服务器上进行。请勿用于官方服务器。
+
+## LICENSE
+
+GNU GPL 3.0，全文见 [`LICENSE`](LICENSE)。
+
+本项目是衍生作品，不是原创实现：
+
+- [`gc/Server_v3.js`](gc/Server_v3.js) 基于
+  **[aka3257/CSGO-GC-Replacement](https://github.com/aka3257/CSGO-GC-Replacement)**
+  （作者 aka3257，GPL 3.0）的 `Server_v3.js` 修改 —— GC 侧改动留档在
+  [`tools/gc-local-changes.patch`](tools/gc-local-changes.patch)
+- 客户端注入框架 `csgc.dll` 出自
+  **[aka3257/csgc](https://github.com/aka3257/csgc)**（同为 GPL 3.0）
+- `tools/` 下的静态分析、VPK/Panorama 处理与服务端补丁脚本为本项目原创
+
+因此本仓库整体以 GPL 3.0 分发。若要用于闭源场景，需要先取得上游作者的例外授权。
