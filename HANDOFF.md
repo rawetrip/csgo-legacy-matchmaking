@@ -192,7 +192,7 @@ srcds 启动时会通过 Steam 客户端的 GC 代理向 GC 发 9106，得到
 ### 5.2 csgc（`~/csgc-src`）
 
 ```bash
-py patch_rearm.py / py patch_delay.py     # 改源码（bytes 级，见坑 5）
+py patch_rearm.py / py patch_delay.py     # 改源码（bytes 级，见坑 13）
 cd csgc-src && cmake --build build --config Release
 cp dist/csgc/csgc.dll "<游戏目录>/csgc/csgc.dll"     # 游戏关着才能覆盖
 ```
