@@ -265,9 +265,6 @@ tools/
 - **[aka3257/CSGO-GC-Replacement](https://github.com/aka3257/CSGO-GC-Replacement)** 与
   **[aka3257/csgc](https://github.com/aka3257/csgc)** —— 本项目所用的外部 JS GC 与
   客户端注入框架（`csgc.dll`）的出处。
-- **[eonexdev/csgo-sv-fix-engine](https://github.com/eonexdev/csgo-sv-fix-engine)** ——
-  归档 appid 被引擎拒绝这一问题的参考实现（有预编译 `.so`）；我们最终选择自己实现了
-  `tools/appidfix.c`。
 
 ## Contributors
 
@@ -291,5 +288,9 @@ GNU GPL 3.0，全文见 [`LICENSE`](LICENSE)。
 - 客户端注入框架 `csgc.dll` 出自
   **[aka3257/csgc](https://github.com/aka3257/csgc)**（同为 GPL 3.0）
 - `tools/` 下的静态分析、VPK/Panorama 处理与服务端补丁脚本为本项目原创
+
+**例外：`gc/proto/` 不在上述许可覆盖范围内。** 那 6 个 `.proto` 是 **Valve Corporation
+的协议定义**，为互操作性而收录，版权归 Valve —— 详见
+[`gc/proto/NOTICE.md`](gc/proto/NOTICE.md)。
 
 因此本仓库整体以 GPL 3.0 分发。若要用于闭源场景，需要先取得上游作者的例外授权。

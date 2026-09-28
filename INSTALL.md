@@ -144,20 +144,33 @@ node Server_v3.js                          # 监听 0.0.0.0:3257
 客户端靠 `csgc.dll` 把 GC 流量转发到你的 GC（`forwarder.cpp` 里的地址是**硬编码**的，改了要重编译）。
 服务器侧则靠 §0 里那个 `csgo_gc` —— **两条都要通**，否则服务器收不到预约、`Map veto pick controller` 不会跑。
 
-### 4.2 客户端资源：`code.pbin`（接受弹窗 + prime 兜底）
+### 4.2 客户端资源：`code.pbin`（接受弹窗）
+
+**本包不含成品的 `party.js`。** 它是 **Valve 的** `csgo/panorama/scripts/party.js`
+（原始 **13497** 字节）的修改版，而 Valve 2018 年正是为「从 `code.pbin` 反编译出来的
+Panorama JS 与 layout」发过 DMCA（[github/dmca 2018-06-21](https://github.com/github/dmca/blob/master/2018/2018-06-21-Valve.md)）。
+所以用**你自己的原始件**现生成一份：
 
 ```bash
 # 游戏必须关着！启动时会把资源读进内存，开着改等于没改
-py tools/pbin_tool.py put panorama/scripts/party.js client/party.js   # ← 用 csgo-legacy-premier 仓库里那份
-# 回读校验（每次都要做）
+# 1. 取出原始件（应为 13497 字节）
+py tools/pbin_tool.py get panorama/scripts/party.js party_orig.js
+# 2. 生成（应为 17464 字节）
+py tools/make_party.py party_orig.js party_patched.js
+# 3. 写回 + 回读校验（每次都要做）
+py tools/pbin_tool.py put panorama/scripts/party.js party_patched.js
 py tools/pbin_tool.py get panorama/scripts/party.js readback.js
-cmp readback.js client/party.js && echo OK
+cmp readback.js party_patched.js && echo OK
 ```
 
-判据：`code.pbin` 总大小 **4708665**；`party.js` 是 **19898** 字节（原始版是 13497）。
+判据：`party.js` 从 **13497**（原始）→ **17464**（补丁版）。这个复现是**逐字节验证过**的。
 
 > ⚠️ `party.js` 被**两个功能**占用：接受弹窗（触发/音效/关闭）和 prime 的 JS 兜底。
 > 若哪个补丁要求"把 party.js 还原成原始版"，另一个功能会**静默失效**——踩过。
+>
+> 不过 **prime 那一半已经废弃**（现在靠 GC 侧修 `owner_soid.id`），所以
+> `make_party.py` 生成的 **17464** 版就够用 —— 它只含弹窗块。早期流出过的 **19898**
+> 版是在此之上又叠了一个 prime 块，那个块现在没有任何作用，不必再装。
 
 ---
 

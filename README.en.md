@@ -308,9 +308,6 @@ Parts of this project referenced or used these upstream / sibling projects:
 - **[aka3257/CSGO-GC-Replacement](https://github.com/aka3257/CSGO-GC-Replacement)** and
   **[aka3257/csgc](https://github.com/aka3257/csgc)** — the origin of the external JS GC and the
   client injection framework (`csgc.dll`) used here.
-- **[eonexdev/csgo-sv-fix-engine](https://github.com/eonexdev/csgo-sv-fix-engine)** — reference
-  implementation for the archived-appid rejection (ships a prebuilt `.so`); we ended up writing
-  our own `tools/appidfix.c`.
 
 ## Contributors
 
@@ -337,5 +334,9 @@ This project is a derivative work, not an original implementation:
 - The static-analysis, VPK/Panorama and server-patch tooling under `tools/` is original
   to this project
 
-The repository as a whole is therefore distributed under GPL 3.0. Using it in a
-closed-source context requires an exception from the upstream author first.
+**Exception: `gc/proto/` is not covered by the licence above.** Those six `.proto` files are
+**Valve Corporation's protocol definitions**, included for interoperability; copyright remains
+with Valve — see [`gc/proto/NOTICE.md`](gc/proto/NOTICE.md).
+
+The repository as a whole is therefore distributed under GPL 3.0, except for `gc/proto/`.
+Using it in a closed-source context requires an exception from the upstream author first.
