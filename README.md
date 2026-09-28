@@ -39,6 +39,60 @@ CS:GO Legacy 的官方 GC 早已下线，因此「竞技」按钮点了不会有
   → 引擎主线程执行它 → 进服
 ```
 
+## ★ 完整匹配流程：已打通（2026-09-29）
+
+```
+点「开始竞技」→ 自动就绪 → 自动连服
+  → 服务器加载 lobby_mapveto（选图大厅图）→ 大厅热身窗口
+  → BP 选/禁图（客户端侧 UI，可正常操作）→ 选初始队伍
+  → 服务器里的 Map veto pick controller 自动 changelevel 到选定的图 → 正常对局
+```
+
+实测走通：BP 选中 `de_ancient`，服务器日志
+`Map veto pick controller: pick = de_ancient` → `initiating level transition to de_ancient`
+→ `*** Map Load: de_ancient`，随后正常分队、开局、打完整回合。
+
+### 需要的改动
+
+**1. srcds 启动参数**（完整注释见 [`tools/start-srcds.sh`](tools/start-srcds.sh)）
+
+| 参数 | 为什么 |
+|---|---|
+| `+sv_lan 0` | 真实 Steam 身份（需 GSLT）；代价是 reservation cookie 非零，靠 srvfix 绕过 |
+| `+game_type 0 +game_mode 1` | competitive。**必须显式指定** —— 默认 casual 时选图大厅图不在它的 mapgroupsMP 里，mapgroup 关联不上（`status` 里 mapgroup 为空），图内大厅逻辑不激活 |
+| `+map lobby_mapveto` | **起点必须是选图大厅图**。注意：服务器加载哪张图**不由 GC 的 9106 `map` 字段决定**，就是这个 `+map` |
+| `-nowatchdog` | 否则玩家连入、地图加载完后会 `Watchdog timer exceeded, aborting!`（退出码 134） |
+
+**2. `csgo_srvfix.so`**（[`tools/srvfix.c`](tools/srvfix.c)）：reservation cookie 放行 ·
+换图 detour · **桩页设可执行**（mmap 出来的页是 NX 的，跳进去必崩）·
+NOP 掉非主线程的 `Cbuf_Execute` · 抹掉无效模式名 `reserved`
+
+**3. GC 侧**（[`tools/gc-local-changes.patch`](tools/gc-local-changes.patch)）
+
+- 9106 补 `account_ids`：原来那段代码用了两个不存在的变量、每次必抛 `ReferenceError`，
+  从未执行过 → 服务器 `reserved(yes), clients(no)` 拒绝所有连接
+- ★ **9107 的 `preMatchData.draft` 从空数组改成对象**：proto 里它是
+  `CDataGCCStrike15_v2_TournamentMatchDraft` 对象，传 `[]` 类型不符会被 protobufjs
+  **静默丢弃** → 客户端永远拿不到 draft → `MatchDraftAPI.GetDraft()` 永不等于 `'ingame'`
+  → **BP 界面不出现**。（同一个坑在服务器侧 9105 里修过一次，客户端 9107 漏了。）
+
+### 三个反直觉的点（都踩过）
+
+- 选图大厅图由 **`+map` 启动参数**决定，不是 GC 下发的地图字段
+- 局内选/禁图是**客户端侧**特性（`MatchDraftAPI` 在 `client.dll`，
+  服务器模块里搜不到任何 draft 字符串）；但**换图是服务器侧**的 ——
+  `Map veto pick controller` 实体自己 changelevel，不需要 GC 参与
+- 那 5 分钟"热身"来自 `gamemode_competitive.cfg` 的 `mp_warmuptime 300`；
+  可用 `csgo/cfg/gamemode_competitive_server.cfg` 覆盖（该文件默认不存在但会被 exec，
+  且在模式 cfg **之后**执行，所以能盖掉）
+
+### 还没做
+
+- BP 自动化（不点 UI 完成选图）
+- 匹配成功后「正在确认比赛」状态不消失
+
+---
+
 ## 真正卡住的地方：服务器的 reservation cookie
 
 服务端 `engine.so`（32 位，`Addr == Off`）在 `0x1d0776` 起的判定：
