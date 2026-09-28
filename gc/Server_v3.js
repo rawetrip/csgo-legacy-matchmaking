@@ -1,8 +1,11 @@
-// ⚠️ 已脱敏：作者 SteamID64 / accountId 默认值 / 主机 IP / 游戏服 SteamID
-//    均替换为占位符（7656119XXXXXXXXXX / 100000000 / HOST_LAN_IP / YOUR_GS_STEAMID）。
-//    官方 SteamID64 基准 76561197960265728 与 GameServerCookieId "Hello :)"
-//    是公开常量，未替换。
-//    部署前请把 config.json 里你自己的值填好（见 INSTALL.md）。
+// ⚠️ 本文件已脱敏（相对 gc-replacement/Server_v3.js 的可用副本）：
+//     作者 SteamID64      -> 7656119XXXXXXXXXX
+//     默认 accountId      -> 100000000
+//     主机局域网 IP       -> HOST_LAN_IP
+//     游戏服 SteamID      -> YOUR_GS_STEAMID
+//   官方 SteamID64 基准 76561197960265728 与 GameServerCookieId "Hello :)"
+//   是公开常量，未替换。
+//   （同步到 2026-09-29 的完整匹配流程版本 + ongoingmatch 那次试错与其回退原因。）
 //
 const net = require('node:net');
 const protobuf = require('protobufjs');
@@ -941,6 +944,35 @@ events.on('CMsgGCCStrike15_v2_MatchmakingClient2ServerPing', (data, socket, stea
                                // 此刻服务器跑的正是大厅图，所以这里写大厅图才一致
         serverAddress: `${MATCH_SERVER_IP}:${MATCH_SERVER_PORT}`
     });
+
+    // [新增] 紧接着告诉客户端「已进入对局」—— 否则 UI 上的「正在确认比赛」在对局中
+    // 和结束后都不消失（用户报的 bug）。
+    //
+    // proto 里 CMsgGCCStrike15_v2_MatchmakingGC2ClientUpdate 有：
+    //     optional int32  matchmaking                        = 1;   // 0=空闲 1=搜索中
+    //     repeated uint32 waiting_account_id_sessions        = 2;   // 排队中的人
+    //     repeated uint32 ongoingmatch_account_id_sessions   = 6;   // ★ 正在一局里的人
+    // 我们此前只发过 matchmaking:1 + waiting（搜索中），**从来没发过 ongoingmatch** ——
+    // 客户端因此一直停在"已预约/确认中"的状态。
+    //
+    // 必须**同步**发（不能 setTimeout）：GC 的 socket 是「发完就关」的短连接，
+    // 延迟发送时 socket 早就没了。
+    // [已回退 2026-09-29] 这条 ongoingmatch 的 9104 **会把匹配弄坏**：
+    // 它紧跟在 9107 之后发，客户端于是认为"已经在局里了"，
+    // 下次点「开始竞技」会闪一下就弹回（实测）。
+    // 正确时机应该是**对局真正开始之后**，而 GC 的 socket 是发完就关的短连接，
+    // 没地方挂延时发送 —— 要做得对得等客户端主动来消息时再回。
+    // 暂时关掉：这个 bug（"正在确认比赛"不消失）比起"根本匹配不了"是小问题。
+    if (process.env.JSO_ONGOING_MATCH === '1') {
+        sendProto(socket, 9104, 'CMsgGCCStrike15_v2_MatchmakingGC2ClientUpdate', {
+            matchmaking: 0,
+            waitingAccountIdSessions: [],
+            ongoingmatchAccountIdSessions: [AccountId],
+            globalStats: getGlobalStats(),
+            notes: []
+        });
+        console.log(`[MATCH] 已告知客户端进入对局（ongoingmatch=${AccountId}）`);
+    }
 });
 
 // ── 服务器 9106 的应答：一份完整的 9105 GC2ServerReserve ──────────────────

@@ -204,13 +204,42 @@ CS:GO 原生机制，与 `gamemodes.txt` **合并**。语法：cvar 要写在 ga
 
 ---
 
+## 7.5 客户端 JS 补丁（改 `code.pbin` 里的 panorama 脚本）踩过的坑
+
+想动 `mapdraft.js` / `party.js` 这类脚本时，下面几条都是实测撞出来的：
+
+| 坑 | 现象 | 正解 |
+|---|---|---|
+| **Panorama 里没有 `window`** | 加载时抛 `ReferenceError`，**整个文件执行中断** —— 连你自己加的「已装载」日志都打不出来，看起来像"补丁没被加载" | 用文件顶层的普通 `var`，别用 `window.xxx` |
+| **`$.RegisterForUnhandledEvent` 只在事件"无人处理"时回调** | 官方自己也给同一事件注册了处理器 → 你的回调**永远不触发** | 要么换 `$.RegisterEventHandler(name, panel, cb)`，要么干脆别依赖事件 |
+| **`$.RegisterEventHandler` 也不一定触发** | 实测挂着就一条日志没有（事件没派发到那个 panel） | 见下一条，最稳的是**注入官方函数体** |
+| **`_Update` 开头有多个提前 `return`** | 把调用插在函数**末尾** → 那些 return 一发生就永远到不了（实测零日志） | 插在**函数最开头**，该不该干活由你自己的函数判断 |
+| **`$.Schedule` 轮询会随 panel 卸载而死** | 轮询能跑，但那时 `GameStateAPI.GetCSGOGameUIStateName()` 是 `MAINMENU`/`LOADINGSCREEN`；等真正进图 BP 开始时 panel 已卸载 | 别指望轮询撑到 BP；用注入 |
+
+**结论**：要在 BP/弹窗这类"只在特定时刻出现"的流程里插逻辑，**注入官方函数体**（找一个它已经确认过前置状态的位置）最可靠 —— 事件、轮询两条路都试废了。
+
+改完**必须回读校验**（`pbin_tool.py get` + `cmp`），判据记在 §4.2。
+
+---
+
 ## 8. 已知限制（**没做完的**）
 
 - **进服时仍会弹「选阵营」菜单**（大厅图那次、以及换图后那次都是）。
   `mp_force_assign_teams 1` + `mp_force_pick_time 3` 已生效（菜单 3 秒后自动分配），
   但菜单**仍会短暂出现**。怀疑最终答案在 GC 的预约数据（队伍归属），不在服务器 cvar。
-- **BP 仍需手动操作**（阶段推进由地图的 `mapvetopick_controller` 控制）。
-- 匹配成功后「正在确认比赛」状态不消失。
+- **BP 自动化（不用手点选/禁图）—— 做到一半**。
+  已经打通"让代码跑进 BP 那一刻"（见 §7.5：注入官方 `_Update` 开头），
+  但目标图的定向还没调对（实测自动跑完会落到别的图上）。
+  做法是把 `_autoVote()` 注入 `panorama/scripts/mapdraft.js`：
+  轮到我方时 ban 掉所有非目标图、随机选阵营。
+- **匹配成功后「正在确认比赛」状态不消失 —— 试过一版，已回退**。
+  正解看起来是 `CMsgGCCStrike15_v2_MatchmakingGC2ClientUpdate`（9104）里的
+  `ongoingmatch_account_id_sessions`（field 6，官方表示"正在一局里"的字段），
+  我们此前从没发过它。但**紧跟在 9107 后发会把匹配弄坏**：客户端以为已经在局里，
+  下次点「开始竞技」闪一下就弹回（实测）。
+  正确时机应该是**对局真正开始之后**，而 GC 的 socket 是"发完就关"的短连接，
+  没地方挂延时发送 —— 要做得对得等客户端主动来消息时再回。
+  代码留在 `gc/Server_v3.js`（默认关，`JSO_ONGOING_MATCH=1` 才开）。
 - 所有 RVA（`srvfix.c` 里那些硬编码的偏移）基于**构建 1575**定位，**换版本要重新定位**。
 
 ---
