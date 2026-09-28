@@ -1,0 +1,17 @@
+{
+  "host": "0.0.0.0",
+  "port": 3257,
+  "PlayerData": "./playerData",
+  "protoPath": "./proto",
+  "devmode": false,
+  "serverVersion": "13881",
+  "serverIp": "0.0.0.0",
+
+  "matchServerIp": "HOST_LAN_IP",
+  "matchServerPort": 27015,
+  "matchMap": "de_cache",
+
+  "accountId": 100000000,
+  "gsSteamId": "YOUR_GS_STEAMID",
+  "matchId": 1488
+}

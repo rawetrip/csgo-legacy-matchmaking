@@ -1,0 +1,24 @@
+// CS:GO 的「服务端模式覆盖」文件，与 gamemodes.txt 合并。
+//
+// 注意语法：cvar 要写在 gameMode 的 **convars 块**里 —— 直接写在 mapgroup 下不会生效（试过）。
+// 用来逐项验证服务器侧覆盖是否真的生效。
+"GameModes_Server.txt"
+{
+	"gameTypes"
+	{
+		"classic"
+		{
+			"gameModes"
+			{
+				"competitive"
+				{
+					"convars"
+					{
+						"mp_force_assign_teams"	"1"
+						"mp_force_pick_time"		"3"
+					}
+				}
+			}
+		}
+	}
+}
