@@ -81,6 +81,38 @@ const MATCH_ID = Number(config.matchId || 1488);
 // "#Valve_Reject_Connect_From_Lobby" 拒绝所有连接。
 const KNOWN_ACCOUNT_ID = Number(config.accountId || 100000000);
 
+// [启动自检] 「脱敏版 + `||` 回退值」= 静默降级：config.json 少一个键就会悄悄用占位符，
+// 而且**不会有任何报错**。accountId 回退成 100000000 会让服务器预约里写成另一个玩家，
+// 匹配直接废掉，日志一个字都不提示 —— 这次就是靠人肉对 diff 才发现的。
+//
+// 光比对已知占位符不够：还有「回退值恰好等于真实值」的情况（如 matchId 的 1488）。
+// 所以**同时把生效值打出来**（脱敏），以后新增的脱敏位或这类巧合一眼可见。
+function maskConfigValue(v) {
+    const s = String(v);
+    if (s === 'undefined' || s === '') return '(未设)';
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(s)) return s.split('.').slice(0, 2).join('.') + '.*.*';
+    if (s.length <= 6) return s;
+    return s.slice(0, 4) + '*'.repeat(s.length - 5) + s.slice(-1);
+}
+
+const CONFIG_SELFCHECK = [
+    ['accountId',     config.accountId,     100000000],
+    ['gsSteamId',     config.gsSteamId,     'YOUR_GS_STEAMID'],
+    ['matchServerIp', config.matchServerIp, 'HOST_LAN_IP'],
+];
+
+console.log('[CONFIG] effective: ' + CONFIG_SELFCHECK
+    .map(([k, v]) => k + '=' + maskConfigValue(v)).join('  '));
+
+const kBadConfig = CONFIG_SELFCHECK.filter(([, v, ph]) => v === undefined || v === ph);
+for (const [k, v] of kBadConfig) {
+    console.error(`[CONFIG] !! ${k} 缺失或仍是占位符（当前 ${maskConfigValue(v)}）`
+        + ' —— 匹配会静默失败，请检查 config.json');
+}
+if (kBadConfig.length) {
+    console.error(`[CONFIG] !! 共 ${kBadConfig.length} 项待补。补法见 INSTALL.md §3。`);
+}
+
 // [自定义] reservation cookie —— 与上游 csgo_gc 保持一致。
 //
 // 上游定义（csgo_gc/gc_const_csgo.h:6）：
@@ -1460,7 +1492,7 @@ function pollMapFiles() {
 if (MAP_SYNC_ENABLED) {
     pollMapFiles();
 } else {
-    console.log('[MAP] 外部换图通道未启用（config.json 里没配 csgoDir / vmSshPath）');
+    console.warn('[MAP] !! 外部换图通道未启用（config.json 里没配 csgoDir / vmSshPath）');
 }
 
 // params

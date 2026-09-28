@@ -110,15 +110,30 @@ node Server_v3.js                          # 监听 0.0.0.0:3257
 
 `config.json` 要填的：
 
-| 键 | 说明 |
-|---|---|
-| `matchServerIp` | srcds 所在机器的地址 |
-| `matchServerPort` | 默认 27015 |
-| `accountId` | **你的 accountId**（= SteamID64 − `76561197960265728`） |
-| `gsSteamId` | 你的游戏服 SteamID（服务器日志里 `Gameserver logged on to Steam, assigned identity steamid:...` 会给） |
+| 键 | 说明 | 不填会怎样 |
+|---|---|---|
+| `matchServerIp` | srcds 所在机器的地址 | 回退成 `HOST_LAN_IP` |
+| `matchServerPort` | 默认 27015 | 回退成 27015（等于默认值） |
+| `accountId` | **你的 accountId**（= SteamID64 − `76561197960265728`） | ★ **回退成 `100000000`** —— 服务器预约里会写成另一个玩家，**匹配直接废掉，且日志一个字都不提示** |
+| `gsSteamId` | 你的游戏服 SteamID（服务器日志里 `Gameserver logged on to Steam, assigned identity steamid:...` 会给） | ★ 回退成 `YOUR_GS_STEAMID` |
+| `csgoDir` | CS:GO 客户端目录（**末尾带反斜杠**）。只有用「外部换图通道」才需要 | 该通道不启用 |
+| `vmSshPath` | 你自己写的「传文件进 VM + 在 VM 里跑命令」的小工具。同上 | 该通道不启用 |
 
 > ⚠️ `gc/Server_v3.js` 里的作者 SteamID / IP / 游戏服 SteamID **已替换成占位符**，
 > 你不需要改它——真正的值都从 `config.json` 读。
+> **但正因为是脱敏版，每个键都带 `||` 回退值** —— 少填一个不会报错，只会静默用占位符。
+> `accountId` 那一条尤其致命：启动正常、日志干净，但就是匹配不上。
+
+**启动时看这一行判断有没有填对**（值已脱敏，不会把真实 SteamID 写进日志）：
+
+```
+[CONFIG] effective: accountId=1841****6  gsSteamId=8556***********7  matchServerIp=192.168.*.*
+```
+
+只要出现 `[CONFIG] !!` 就是有键没填，补完再启动。
+
+> 💡 `csgoDir` / `vmSshPath` 留空只会打一行 `[MAP] !! 外部换图通道未启用`，
+> **不影响普通对局** —— 换图由游戏服务器自己的 `Map veto pick controller` 实体完成。
 
 ---
 
