@@ -10,6 +10,14 @@
 > `Map veto pick controller: pick = de_ancient` → `initiating level transition` → `*** Map Load: de_ancient`，
 > 随后正常分队、开局、打完整回合。
 
+## ⚠️ 适用范围
+
+| | 限制 |
+|---|---|
+| **服务端** | **仅限 Linux 端 srcds**。换图补丁是按 `engine.so`（32 位 ELF）的硬编码偏移写的 |
+| **客户端** | **仅限「狂牙大行动」（Operation Broken Fang）那一版构建**；优先（Prime）修复只在该版本验证过 |
+| **版本** | 所有硬编码偏移基于 **2026-09-26** 的构建，换版本必须重新定位 |
+
 ---
 
 ## 0. 你需要自己准备什么（本包不含）
