@@ -3,6 +3,8 @@
 //     默认 accountId      -> 100000000
 //     主机局域网 IP       -> HOST_LAN_IP
 //     游戏服 SteamID      -> YOUR_GS_STEAMID
+//     本机路径 / 用户名   -> 提成 config.json 的 csgoDir / vmSshPath
+//                            （两项留空 = 外部换图通道不启用，默认如此）
 //   官方 SteamID64 基准 76561197960265728 与 GameServerCookieId "Hello :)"
 //   是公开常量，未替换。
 //   （同步到 2026-09-29 的完整匹配流程版本 + ongoingmatch 那次试错与其回退原因。）
@@ -53,11 +55,6 @@ const SERV_IP = config.serverIp; //ip for srcds, not used at that moment
 // [自定义] 匹配成功后要分配的自建服务器。原项目未实现此块，这里补上。
 const MATCH_SERVER_IP = config.matchServerIp || 'HOST_LAN_IP';
 const MATCH_SERVER_PORT = Number(config.matchServerPort || 27015);
-const MATCH_MAP = config.matchMap || 'de_cache';
-// 服务器实际在跑的地图。**客户端加载哪张图由 9107/9106 里的 map 字段决定**，
-// 所以切图之后这里必须跟着变 —— 否则客户端按旧值加载、和服务器对不上，
-// 表现为反复连接又被踢（Dropped ... Disconnect 循环）。
-let g_serverMap = MATCH_MAP;
 
 // [2026-09-28 深夜] 服务器在「veto 环节」该加载的地图 —— **不是**正式比赛图。
 //
@@ -68,7 +65,7 @@ let g_serverMap = MATCH_MAP;
 // 官方形态是：服务器先加载这张专门的选图大厅图，图里自带 lobby 逻辑跑选/禁图，
 // 定完图再 changelevel 到正式图。
 //
-// 我们原来把 9106 里的预约地图写成 g_serverMap（= de_cache），服务器就直接加载
+// 我们原来把 9106 里的预约地图写成正式比赛图（de_cache），服务器就直接加载
 // de_cache —— 没有任何 veto 环节。改成这张图，veto 才有地方发生。
 const LOBBY_MAPVETO = 'lobby_mapveto';
 
@@ -904,7 +901,7 @@ events.on('CMsgGCCStrike15_v2_MatchmakingClient2ServerPing', (data, socket, stea
     // 就是 GC_COOKIE）。原来是 '0'，和服务器对不上 —— srvfix 把整段判定绕过去时看不出问题，
     // 一旦关掉补丁就表现为「reservation 永远耗不掉 → 每次连接重放换图 → 死循环」。
     const reservationId = '0';
-    console.log(`[MATCH] 下发服务器 ${MATCH_SERVER_IP}:${MATCH_SERVER_PORT} (map=${MATCH_MAP}) 给 ${AccountId}`);
+    console.log(`[MATCH] 下发服务器 ${MATCH_SERVER_IP}:${MATCH_SERVER_PORT} (map=${LOBBY_MAPVETO}) 给 ${AccountId}`);
     sendProto(socket, 9107, 'CMsgGCCStrike15_v2_MatchmakingGC2ClientReserve', {
         serverid: String(config.gsSteamId || 'YOUR_GS_STEAMID'),
         directUdpIp: ipToUint32(MATCH_SERVER_IP),
@@ -1402,17 +1399,20 @@ const server = net.createServer((socket) => {
 // 轮询更省心，而且这个事件一场比赛最多发生几次。
 const { execFile } = require('child_process');   // fs 已在文件顶部 require
 
-const CSGO_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\csgo legacy\\';
+// 外部换图通道的路径。**两项都留空 = 不启用**（默认）。
+// 原先这里硬编码的是作者本机的路径与 Windows 用户名，读者跑起来必然失败。
+const CSGO_DIR = config.csgoDir || '';       // 例: 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\csgo legacy\\'
+const VMSSH_PATH = config.vmSshPath || '';   // 自己写：能传文件进 VM + 在 VM 里跑命令
+const MAP_SYNC_ENABLED = Boolean(CSGO_DIR && VMSSH_PATH);
+
 const VETO_FILE = CSGO_DIR + 'veto_map.txt';       // csgc 在 veto 定图时自动写入
 const MANUAL_FILE = CSGO_DIR + 'server_map.txt';   // 手写指定：想打哪张图就写哪张
-const VMSSH_PATH = 'C:\\Users\\Administrator\\vmssh.py';
 
 let g_vetoMapApplied = null;
 
 function applyServerMap(map) {
     if (!map || map === g_vetoMapApplied) return;
     g_vetoMapApplied = map;
-    g_serverMap = map;      // 9107/9106 下发给客户端的地图要跟着走
 
     // srcds 被 script(1) 包在伪终端里、TCP RCON 又不监听，唯一的通道是往它的
     // pts 注入。注意：echo > /dev/pts/N 只是往终端"输出"，命令会被显示但不执行
@@ -1455,7 +1455,13 @@ function pollMapFiles() {
     }, 2000);
     console.log(`[MAP] 轮询 ${VETO_FILE} 与 ${MANUAL_FILE}（每 2 秒）`);
 }
-pollMapFiles();
+
+// 没配路径就不轮询 —— 否则读者机器上每 2 秒一次必然失败的 execFile。
+if (MAP_SYNC_ENABLED) {
+    pollMapFiles();
+} else {
+    console.log('[MAP] 外部换图通道未启用（config.json 里没配 csgoDir / vmSshPath）');
+}
 
 // params
 

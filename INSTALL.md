@@ -74,17 +74,21 @@
 
 ### 2.2 `csgo_appidfix.so`（让 legacy 客户端票据过 appid 校验）
 
+先把 `tools/appidfix.c` 送进 VM（`scp`、共享目录、直接粘贴都行），然后**在 VM 内**编译：
+
 ```bash
-py vmscp.py tools/appidfix.c appidfix.c
-py vmssh.py "gcc -m32 -shared -fPIC -O2 -o csgo_appidfix.so appidfix.c -ldl"
+gcc -m32 -shared -fPIC -O2 -o csgo_appidfix.so appidfix.c -ldl
 ```
 
 ### 2.3 `csgo_srvfix.so`（五个补丁，见 `tools/srvfix.c` 头部注释）
 
 ```bash
-py vmscp.py tools/srvfix.c srvfix.c
-py vmssh.py "gcc -m32 -shared -fPIC -O2 -o csgo_srvfix.so srvfix.c -ldl"
+gcc -m32 -shared -fPIC -O2 -o csgo_srvfix.so srvfix.c -ldl
 ```
+
+> 两个 `.so` 都必须在 **Linux VM 内**编译 —— 产物是 32 位 ELF，需要 `gcc-multilib`。
+> 本仓库作者用的是自己写的 `vmscp.py` / `vmssh.py`（paramiko 传文件 + 跑命令），
+> 那是**个人工具，未收录进本仓库**；你用任何顺手的方式把文件送进 VM 即可。
 
 五个补丁：cookie 放行 · 换图 detour（**默认关**，`SRVFIX_DETOUR=1` 才开）·
 **桩页设可执行**（mmap 出来是 NX 的，跳进去必崩）· NOP 非主线程的 `Cbuf_Execute` · 抹掉无效模式名 `reserved`。
@@ -194,7 +198,7 @@ tmux send-keys -t srcds 'mp_force_pick_time' Enter      # 查询
 tmux send-keys -t srcds 'mp_force_pick_time 3' Enter    # 修改
 ```
 
-前提：srcds 跑在 tmux 里且 stdout 包在 `script(1)` 里。这比 `tools/srvcmd.sh` 的 TIOCSTI 强——
+前提：srcds 跑在 tmux 里且 stdout 包在 `script(1)` 里。这比 TIOCSTI 那套强——
 **TIOCSTI 看不到回显**，以前只能靠 dump 猜。
 
 ### 7.2 `gamemodes_server.txt`：按模式覆盖 cvar

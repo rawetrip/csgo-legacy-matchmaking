@@ -50,6 +50,10 @@
   写清了那些"逐项都有原因、别删"的东西。
 - **`gc/`**（新）—— `Server_v3.js` + `proto/*.proto` + `config.example.json`。
   **已脱敏**：作者 SteamID64 / accountId / 主机 IP / 游戏服 SteamID 全为占位符。
+  本机路径与 Windows 用户名也已提出 —— 改为 `config.json` 的 `csgoDir` / `vmSshPath`，
+  两项留空则外部换图通道不启用（默认）。
+  另删掉 `matchMap`：它经 `MATCH_MAP` → `g_serverMap` 传递，而 `g_serverMap` 只赋值从不读取，
+  9106/9107 的 map 字段实际用常量 `LOBBY_MAPVETO`，是死配置。
 - **`server-config/`**（新）—— `gamemode_competitive_server.cfg`（热身 10 秒、选边自动分配）
   与 `gamemodes_server.txt`（CS:GO 原生按模式覆盖 cvar）。
 - **`tools/srvfix.c`** —— 五个补丁：cookie 放行 · 换图 detour（默认关）·

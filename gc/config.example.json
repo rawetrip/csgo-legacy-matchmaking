@@ -9,7 +9,9 @@
 
   "matchServerIp": "HOST_LAN_IP",
   "matchServerPort": 27015,
-  "matchMap": "de_cache",
+
+  "csgoDir": "",
+  "vmSshPath": "",
 
   "accountId": 100000000,
   "gsSteamId": "YOUR_GS_STEAMID",
