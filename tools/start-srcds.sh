@@ -1,13 +1,22 @@
 #!/bin/bash
-# 用 script(1) 给 srcds 挂伪终端，让引擎 stdio 变行缓冲，日志实时可读
-#（直接重定向到文件是全缓冲，尾部会截断在半个行上，关键信息看不到）。
+# Launch the Linux CS:GO srcds inside a pty (script(1)) so the log is readable live.
 #
-# sv_lan 0：恢复服务器的 Steam 身份。
-#   之前用 sv_lan 1 是为了绕开 reservation cookie 检查（#Valve_Reject_Connect_From_Lobby），
-#   但代价是服务器在连接确认包里报的 SteamID 是 0
-#   （抓包看到 `B.00000000.0000.0000.0000.0000.`），
-#   而 9-26 那台能用的 Windows 服务器报的是正常的 `lobby id 0`。
-#   认证票据问题（appid 4465480）已由 LD_PRELOAD 的 csgo_appidfix.so 补掉，
-#   所以现在试试不靠 sv_lan 绕，让服务器以正式身份连接。
+# ★ 两处要换成你自己的值（**不要把真实值提交进仓库**，这是公开仓库）：
+#     +sv_setsteamaccount <你的 GSLT>     Steam 游戏服务器登录令牌
+#     +rcon_password      <你的密码>      本文里 rcon 实际没跑起来（TCP 27015 不监听），
+#                                          留着只是为了万一要用
+#
+# 为什么是 sv_lan 1 —— 见 README「真正卡住的地方：服务器的 reservation cookie」：
+#   sv_lan 0 时 srcds 会从 Valve 侧拿到一个非零 reservation cookie，而客户端带的是
+#   GC 下发的 "Hello :)"，两者不等 → 连接被静默拒绝。sv_lan 1 不登录 Steam，
+#   cookie 保持 0 → 命中放行分支。
+#
+# -dev / developer 1：打开 DevMsg。`Rejecting connection request ...` 这类关键行
+#   只有开发者模式才打印；代价是地图加载会刷上万行 DISP_VPHYSICS。
+#
+# LD_PRELOAD 里两个补丁：
+#   csgo_appidfix.so  改 appid 校验跳转表，让 legacy 客户端票据能过
+#   csgo_srvfix.so    仅在回到 sv_lan 0 时才需要：NOP 掉「预留开局」里的
+#                     `map <map> reserved`，否则每次连接都会重载关卡把客户端踢掉
 cd /home/csgo/csgo-server
-exec script -q -f -c "env LD_PRELOAD=/home/csgo/csgo_appidfix.so ./srcds_run -game csgo -console -norestart -ip 0.0.0.0 -port 27015 +sv_setsteamaccount 47242565C3CFF2EB06C757EA3F31697B +sv_lan 0 +sv_hibernate_when_empty 0 +sv_pure 0 +map de_cache" /home/csgo/srcds-run.log < /dev/null
+exec script -q -f -c "env LD_PRELOAD=/home/csgo/csgo_appidfix.so:/home/csgo/csgo_srvfix.so ./srcds_run -game csgo -console -dev -norestart -ip 0.0.0.0 -port 27015 +sv_setsteamaccount YOUR_GSLT_HERE +sv_lan 1 +sv_hibernate_when_empty 0 +sv_pure 0 +rcon_password YOUR_RCON_PASSWORD +map de_cache" /home/csgo/srcds-run.log < /dev/null

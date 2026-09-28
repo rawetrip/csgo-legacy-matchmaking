@@ -22,16 +22,49 @@ CS:GO Legacy 的官方 GC 早已下线，因此「竞技」按钮点了不会有
 | Linux `srcds` 启动、客户端直连进服 | **已通** |
 | 自建 GC 与客户端握手、走完匹配协议 | **已通** |
 | **点「开始竞技」自动进局** | **已通** |
+| 同一游戏进程内反复匹配进服 | **已通** |
+| 「比赛已准备完毕」弹窗（CS2 样式 + 音效 + 时序） | **已通** |
 
 点按钮后的完整链路：
 
 ```
 点「开始竞技」
-  → GC 收到 MatchmakingStart(9103)，下发 9104/9107
+  → GC 收到 MatchmakingStart，下发 9104/9107
   → csgc 在 RetrieveMessage 拿到 9107（内含 server_address）
-  → 8 秒后把 "connect <ip>:<port>" 塞进引擎的命令缓冲区
+  → party.js 轮询到 mmqueue=reserved，派发官方事件 ServerReserved（地图名前面加 '@'）
+  → 官方弹窗以「公告式/休闲」形态出现，1.9 秒后自己自动就绪并关闭
+  → 2.6 秒时 csgc 把 "connect <ip>:<port>" 塞进引擎命令缓冲区（执行标记传 2）
   → 引擎主线程执行它 → 进服
 ```
+
+## 真正卡住的地方：服务器的 reservation cookie
+
+服务端 `engine.so`（32 位，`Addr == Off`）在 `0x1d0776` 起的判定：
+
+```asm
+mov 0x2ec(%esi),%eax        ; 服务器自己的 reservation cookie
+xor  ...                    ; 与客户端 connect 包里带的 cookie 比对
+je  1d2790                  ; 相等 → 放行
+or  %ebx,%ecx
+je  1d2790                  ; ★ 服务器 cookie == 0 → 也放行
+                            ; 否则 → 踢（#Valve_Reject_Reserved_For_Lobby）
+```
+
+`sv_lan 0` 的 srcds 会从 Valve 侧拿到一个**非零**的 reservation cookie，而客户端带的是
+GC 下发的 `Hello :)`（`0x293A206F6C6C6548`），两者不等 → 连接被静默拒绝。
+
+**解法：srcds 用 `sv_lan 1` 跑** —— 不登录 Steam 就拿不到那个 cookie，保持 0 → 走放行分支。
+
+> 日志里 `-> Reservation cookie 0:  reason reserved(yes), clients(no), reservationexpires(0.00)`
+> 那个 **`0` 是写死的常量**，而且**这行只在「服务器 cookie != 0」时才打印** ——
+> 它恰恰是 cookie 非零的证据。早期据此去改 GC 的 `GC_COOKIE`，方向完全反了。
+
+### 另一个坑：连上就被踢（无限重连）
+
+`sv_lan 0` 下，连接处理里有一整块「服务器已预留 → 直接开局」逻辑，会执行
+`nextlevel <map>` + `map <map> reserved` + `Cbuf_Execute` → **每次连接都重载关卡**把客户端
+踢下线，客户端自动重连 → 又重载 → 死循环。`sv_lan 1` 下不触发；要回到 `sv_lan 0`
+则需要 `tools/srvfix.c`（LD_PRELOAD 运行时 NOP 掉那条 map 命令）。
 
 ## 让连接真正发生的那一步
 
@@ -72,22 +105,34 @@ CS:GO Legacy 的官方 GC 早已下线，因此「竞技」按钮点了不会有
 两者都已停用（`return` 掉）。那条路线本身也早已证明无效 —— 引擎从不调用
 `ISteamMatchmaking`，连接现在走 `Cbuf`。
 
-## 未完成：接受弹窗
+## 接受弹窗（已完成）
 
-原版那个「您的比赛已准备完毕！」弹窗**没能做成**。已经确认的事实：
+> 早期结论「这个弹窗关不掉」是**错的**，在此更正：`<PopupCustomLayout>` 虽然缺
+> `PopupPanel` class，但 `$.DispatchEvent("PanoramaComponent_Lobby_ReadyUpForMatch", false, 0, 0)`
+> 能正常关掉它。当时真正的坑是在**运行时用 JS 去戳它的子面板**，把 UI 状态搞坏了
+> （先按键全失效，后崩溃）。
 
-- 弹窗由 `party.js` 的 `PartyMenu.ShowMatchAcceptPopUp(map)` 创建，
-  靠 `code.pbin`（明文 zip，可直接读改）
-- 事件派发侧是死代码：`ServerReserved` 的唯一派发者（`client.dll+0x427FD0` 的唯一调用者
-  `0x45613`）零引用
-- 改用 JS 侧自己判断时机可行（轮询 `game.mmqueue`，收到 reservation 时会从
-  `searching` 翻成 `reserved`），弹窗确实能弹出来
-- 但**关不掉**：那个 `<PopupCustomLayout>` 缺 `PopupPanel` class，不在 PopupManager
-  管辖内，`UIPopupButtonClicked` / `CloseAllVisiblePopups` 对它全都无效；
-  而通过 JS 改它的面板状态会破坏 UI（先按键全失效，后崩溃）
+最终做法（`code.pbin` 里的资源全是明文 zip，可直接改）：
 
-要接着做，建议**直接改 `popup_accept_match.xml`**（把不要的节点删掉、加自动关闭），
-而不是在运行时用 JS 去戳它。
+- **显示**：`party.js` 轮询 `LobbyAPI.GetSessionSettings().game.mmqueue`，翻到 `reserved` 时
+  派发官方事件 `ServerReserved`，**地图名前面加一个 `@`** —— 这是官方「公告式自动就绪」
+  模式的开关（`popup_accept_match.js` 里的 `map.charAt(0) === '@'`）。好处一次拿三个：
+  - 弹窗直接就是 CS2 那种「只有标题 + 模式·地图」的形态（官方 `auto` 样式）
+  - `m_hasPressedAccept` 被置真 → 倒计时用安静的 `waitquiet`（**这就是休闲模式没有 beep 的原因**）
+  - 1.9 秒后官方 `_OnNqmmAutoReadyUp` 自动跑：播 `mm_success_lets_roll`、
+    `LobbyAPI.SetLocalPlayerReady('deferred')`、用官方路径关弹窗
+- **音效**：官方是引擎在抛 `ServerReserved` 时播「比赛就绪」音；我们既然自己抛事件，
+  就得自己补播 `popup_accept_match_found`（`game_ready_02.wav`）
+- **精简面板**：给 `id-map-draft-phase-teams`（假阵容）和 `accept-match__slots-count`
+  （0/10 计数行）加内联 `visibility:collapse`。**只能隐藏、不能删节点** —— 弹窗 JS 会对着
+  这些 id 做 `RemoveAndDeleteChildren()` / `SetDialogVariableInt()` / `RemoveClass()`，
+  节点缺失直接抛异常把 UI 搞坏（`tools/patch_popup.py`）
+- **尺寸**：`.accept-match__map` 高度 300px → 200px（300 是竞技版给阵容区留的，
+  公告式模式用不上；`tools/patch_popup_css.py`）
+
+> 顺带记录一个官方 bug：`mm_success_lets_roll.wav` 在 CS2/CS:GO 官方客户端里**会放两遍**
+> （`_OnNqmmAutoReadyUp` 与另一条路径各播一次）。我们的实现只播一遍 —— 想复现官方行为
+> 就在 `party.js` 的 `_closePopup()` 里再补一次 `popup_accept_match_confirmed`。
 
 ## 目录
 
@@ -111,7 +156,22 @@ tools/
   vpk_get.py              从 pak01 VPK 中取出指定文件（只读）
   vpk_extract.py          按过滤条件批量解包 VPK（默认 sound/，2.4 万条目约 3.8 GB）
   pbin_ls.py              读取 panorama code.pbin（明文 zip）里面的 JS
+
+  # 服务端运行时补丁（LD_PRELOAD 进 srcds，改 engine.so）
+  srvfix.c                仅在 sv_lan 0 时需要：NOP 掉「预留开局」里的 map 命令
+  srvre.py                ELF32 节表/字符串定位（server 侧 engine.so 是 32 位 ELF，
+                          注意 Addr == Off，所以文件偏移即 vaddr）
+
+  # 客户端资源/源码补丁生成器（改完必须 pbin_tool.py put 回读校验）
+  make_party.py           生成 party.js：触发、关闭、音效、时序都在这
+  patch_popup.py          精简 popup_accept_match.xml（隐藏假阵容/计数行，保留全部 id）
+  patch_popup_css.py      压缩弹窗高度（.accept-match__map 300px -> 150px）
+  patch_rearm.py          改 csgc 源码：收到 9101 时清零一次性连接标记
+  patch_delay.py          改 csgc 源码：连接延时 8s -> 5s -> 2.6s
 ```
+
+> 改 `csgc-src` 下的 C++ **必须用 bytes 级替换**（文件是 GBK，MSVC 按 936 读），
+> 别用会解码/重编码的编辑器；编完把 `dist/csgc/csgc.dll` 拷到 `<游戏目录>/csgc/csgc.dll`。
 
 > 这些脚本里的游戏路径是硬编码的，换机器时改开头的 `PATH` / `GAME` 常量即可。
 
