@@ -61,6 +61,10 @@
   抹掉无效模式名 `reserved`。
 - **`tools/start-srcds.sh`** —— 最终启动配方，逐项注释。
 - **`tools/gc-local-changes.patch`** —— GC 侧改动留档（上游仓库不是我们的，推不上去）。
+- **`tools/make_party.py` / `tools/make_mapdraft.py`** —— 客户端 Panorama 脚本的生成器：
+  接受弹窗（`party.js`，13497 → 17464）与 BP 自动点票（`mapdraft.js`，24481 → 30574）。
+  两者改的都是 **Valve 自己的脚本**，所以**只提供生成器、不分发成品**
+  （Valve 2018-06-21 的 DMCA 打的正是 `code.pbin` 反编译产物）。判据见 `INSTALL.md` §4.2 / §4.3。
 - 删除过时的 `HANDOFF.md`（旧快照，与 README 矛盾）。
 
 ## 已知限制
