@@ -172,6 +172,39 @@ cmp readback.js party_patched.js && echo OK
 > `make_party.py` 生成的 **17464** 版就够用 —— 它只含弹窗块。早期流出过的 **19898**
 > 版是在此之上又叠了一个 prime 块，那个块现在没有任何作用，不必再装。
 
+### 4.3 客户端资源：`code.pbin`（BP 自动点票，可选）
+
+同样是 **Valve 的**脚本（`csgo/panorama/scripts/mapdraft.js`，原始 **24481** 字节），
+同样**不含成品**，用你自己的原始件现生成：
+
+```bash
+# 游戏必须关着
+py tools/pbin_tool.py get panorama/scripts/mapdraft.js mapdraft_orig.js   # 应为 24481
+py tools/make_mapdraft.py mapdraft_orig.js mapdraft_patched.js            # 应为 30574
+py tools/pbin_tool.py put panorama/scripts/mapdraft.js mapdraft_patched.js
+py tools/pbin_tool.py get panorama/scripts/mapdraft.js readback.js
+cmp readback.js mapdraft_patched.js && echo OK
+```
+
+默认行为（`opp_random`）：**只在对方轮次随机代投**，我方轮次什么都不做、交给人点。
+想改成"把我方轮次的非目标图全 ban 掉，自动定到某张图"：
+
+```bash
+py tools/make_mapdraft.py mapdraft_orig.js mapdraft_patched.js target de_mirage
+```
+
+**能做和不能做的：**
+
+| | |
+|---|---|
+| ✅ | 对方轮次自动代投 —— 对方不点也不卡住 |
+| ✅ | `target` 模式下把自己轮次的非目标图全 ban 掉 |
+| ❌ | 一个轮次里投满。`_Update` 只在 draft 状态**变化**时触发，所以一个轮次通常只投得出一票，其余由服务器对空队的自动投票补上 |
+
+> ⚠️ 原始件判据是 **24481** 字节、**CRLF** 行尾、无 BOM —— 三项有一条不符就是原始件不对
+> （最常见的：拿已经打过补丁的文件当输入）。脚本会断言失败，**不会产出垃圾**。
+> **这个脚本不幂等**，别把它的输出再喂回去。
+
 ---
 
 ## 5. 验证顺序（每一步都能单独确认）
@@ -250,7 +283,7 @@ CS:GO 原生机制，与 `gamemodes.txt` **合并**。语法：cvar 要写在 ga
 
 **结论**：要在 BP/弹窗这类"只在特定时刻出现"的流程里插逻辑，**注入官方函数体**（找一个它已经确认过前置状态的位置）最可靠 —— 事件、轮询两条路都试废了。
 
-改完**必须回读校验**（`pbin_tool.py get` + `cmp`），判据记在 §4.2。
+改完**必须回读校验**（`pbin_tool.py get` + `cmp`），判据记在 §4.2 / §4.3。
 
 ---
 
@@ -259,11 +292,6 @@ CS:GO 原生机制，与 `gamemodes.txt` **合并**。语法：cvar 要写在 ga
 - **进服时仍会弹「选阵营」菜单**（大厅图那次、以及换图后那次都是）。
   `mp_force_assign_teams 1` + `mp_force_pick_time 3` 已生效（菜单 3 秒后自动分配），
   但菜单**仍会短暂出现**。怀疑最终答案在 GC 的预约数据（队伍归属），不在服务器 cvar。
-- **BP 自动化（不用手点选/禁图）—— 做到一半**。
-  已经打通"让代码跑进 BP 那一刻"（见 §7.5：注入官方 `_Update` 开头），
-  但目标图的定向还没调对（实测自动跑完会落到别的图上）。
-  做法是把 `_autoVote()` 注入 `panorama/scripts/mapdraft.js`：
-  轮到我方时 ban 掉所有非目标图、随机选阵营。
 - **匹配成功后「正在确认比赛」状态不消失 —— 试过一版，已回退**。
   正解看起来是 `CMsgGCCStrike15_v2_MatchmakingGC2ClientUpdate`（9104）里的
   `ongoingmatch_account_id_sessions`（field 6，官方表示"正在一局里"的字段），
