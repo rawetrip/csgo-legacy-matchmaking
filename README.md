@@ -90,8 +90,12 @@ NOP 掉非主线程的 `Cbuf_Execute` · 抹掉无效模式名 `reserved`
 
 ### 还没做
 
-- BP 自动化（不点 UI 完成选图）
 - 匹配成功后「正在确认比赛」状态不消失
+
+> BP 自动化（不点 UI 完成选图）**已经能做**了。但它和接受弹窗一样是靠改 Valve 的
+> `mapdraft.js` 实现的，所以本仓库**只提供生成器**：`tools/make_mapdraft.py`
+> （判据 24481 → 30574，用法见 [INSTALL §4.3](INSTALL.md)）。
+> 默认只在**对方**轮次随机代投，我方轮次交给人点。
 
 ---
 
@@ -227,6 +231,7 @@ tools/
 
   # 客户端资源/源码补丁生成器（改完必须 pbin_tool.py put 回读校验）
   make_party.py           生成 party.js：触发、关闭、音效、时序都在这
+  make_mapdraft.py        生成 mapdraft.js：BP 自动点票（默认只代投对方轮次）
   patch_popup.py          精简 popup_accept_match.xml（隐藏假阵容/计数行，保留全部 id）
   patch_popup_css.py      压缩弹窗高度（.accept-match__map 300px -> 150px）
   patch_rearm.py          改 csgc 源码：收到 9101 时清零一次性连接标记

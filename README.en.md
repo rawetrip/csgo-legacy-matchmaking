@@ -112,8 +112,13 @@ mode name `reserved`
 
 ### Not done yet
 
-- Automated pick/ban (completing veto without touching the UI)
 - The "confirming match" state does not clear after a successful match
+
+> Automated pick/ban (completing veto without touching the UI) **does work now**. But — exactly
+> like the accept popup — it is implemented by modifying Valve's `mapdraft.js`, so this repo
+> **ships only a generator**: `tools/make_mapdraft.py` (criterion 24481 → 30574, see
+> [INSTALL §4.3](INSTALL.md) — Chinese)). By default it proxies votes **only on the opponent's turns**;
+> your own turns stay manual.
 
 ---
 
@@ -264,6 +269,7 @@ tools/
 
   # client resource/source patch generators (always read back to verify after pbin_tool.py put)
   make_party.py           generates party.js: trigger, close, sound, timing all live here
+  make_mapdraft.py        generates mapdraft.js: automated pick/ban (opponent turns only)
   patch_popup.py          slims popup_accept_match.xml (hides fake lineup/counter, keeps every id)
   patch_popup_css.py      compresses popup height (.accept-match__map 300px -> 150px)
   patch_rearm.py          edits csgc source: clear the one-shot connect flag on 9101
